@@ -1,5 +1,6 @@
-from twisted.internet.protocol import Protocol, Factory
+from twisted.internet.protocol import Protocol, Factory, connectionDone
 from twisted.internet import reactor
+from twisted.internet.error import ReactorNotRunning
 
 from SKN_Crypto import SKNPKI, SKNEncryption
 from ChatClient import ChatClientFactory
@@ -18,6 +19,15 @@ class ChatServer(Protocol):
 
     def connectionMade(self):
         self.chatclientfactory.stopTrying()
+
+    def connectionLost(self, reason=connectionDone):
+        try:
+            reactor.stop()
+        except ReactorNotRunning:
+            print("reactor not running")
+            pass
+        else:
+            print("\nConnection Lost: Press Enter To Exit")
 
     def dataReceived(self, data):
         data = data.decode()
@@ -58,10 +68,15 @@ class ChatServer(Protocol):
         while True:
             print(">>> ", end="")
             msg = input()
-            print("\nYou: {}".format(msg))
-            enc_msg = encryption_instance.encrypt_msg(msg, in_hex=True).encode()
-            self.transport.write(enc_msg)
-
+            if msg and not msg == "exit":
+                print("\nYou: {}".format(msg))
+                enc_msg = encryption_instance.encrypt_msg(msg, in_hex=True).encode()
+                self.transport.write(enc_msg)
+            elif msg == "exit":
+                break
+            else:
+                continue
+        self.transport.loseConnection()
 
 class ChatServerFactory(Factory):
 
@@ -70,9 +85,21 @@ class ChatServerFactory(Factory):
         self.PKIClass = SKNPKI
         self.EncryptClass = SKNEncryption
 
+
     def buildProtocol(self, addr):
         return ChatServer(factory=self, chat_client_factory_instance=ChatClientFactory())
 
-if __name__ == '__main__':
-    reactor.listenTCP(55500, ChatServerFactory())
+
+def runThis():
+    reactor.listenTCP(55507, ChatServerFactory())
     reactor.run()
+if __name__ == '__main__':
+    try:
+        runThis()
+    except (KeyboardInterrupt, SystemExit):
+        try:
+            reactor.stop()
+        except ReactorNotRunning:
+            pass
+    finally:
+        print("\nSKNChat Stopped")

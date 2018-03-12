@@ -15,6 +15,7 @@ class SKNEncryption:
 
         cipher = AES.new(self.key, AES.MODE_CFB, self.iv)
 
+
         cipher_text = self.iv + cipher.encrypt(msg.encode())
         return cipher_text.hex() if in_hex else cipher_text
 
@@ -46,7 +47,7 @@ class SKNPKI:
         self.publicKey = None
 
     def generate_keys(self):
-        key = RSA.generate(3072)
+        key = RSA.generate(4096)
         self.privateKey =key.exportKey("DER")
         self.publicKey = key.publickey().exportKey("DER")
 

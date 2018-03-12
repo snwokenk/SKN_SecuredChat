@@ -1,4 +1,5 @@
 from twisted.internet.protocol import Protocol, ReconnectingClientFactory, connectionDone
+from twisted.internet.error import ReactorNotRunning
 from twisted.internet import reactor
 from twisted.internet.defer import Deferred
 
@@ -49,7 +50,7 @@ class ChatClient(Protocol):
                 # decrypt text with AES key provided by peer
                 data = self.enc_instance.decrypt_msg(data).decode()
 
-                # display text
+                # display test text "Message Now Encrypted"
                 print(data)
 
                 # create a separate thread, using callinThread (not callFromThread), for replying without blocking
@@ -75,17 +76,29 @@ class ChatClient(Protocol):
                 # send encrypted test message to peer
                 self.transport.write(msg)
 
-    def sendMsg(self,  encryption_instance):
+    def sendMsg(self, encryption_instance):
+
         while True:
             print(">>> ", end="")
             msg = input()
-            print("\nYou: {}".format(msg))
-            enc_msg = encryption_instance.encrypt_msg(msg, in_hex=True).encode()
-            self.transport.write(enc_msg)
+            if msg and not msg == "exit":
+                print("\nYou: {}".format(msg))
+                enc_msg = encryption_instance.encrypt_msg(msg, in_hex=True).encode()
+                self.transport.write(enc_msg)
+            elif msg == "exit":
+                break
+            else:
+                continue
+
+        self.transport.loseConnection()
 
     def connectionLost(self, reason=connectionDone):
-        print(reason)
-        reactor.stop()
+        try:
+            reactor.stop()
+        except ReactorNotRunning:
+            print("\nreactor not running")
+        else:
+            print("\nConnection Lost: Press Enter To Exit")
 
 
 class ChatClientFactory(ReconnectingClientFactory):
@@ -97,10 +110,20 @@ class ChatClientFactory(ReconnectingClientFactory):
     def buildProtocol(self, addr):
         return ChatClient(factory=self)
 
-
-
+def runThisClient():
+    reactor.connectTCP("127.0.0.1", 55507, ChatClientFactory())
+    reactor.run()
 
 if __name__ == '__main__':
-    reactor.connectTCP("127.0.0.1", 55500, ChatClientFactory())
+    try:
+        runThisClient()
 
-    reactor.run()
+    except KeyboardInterrupt:
+        try:
+            reactor.stop()
+        except ReactorNotRunning:
+            pass
+        finally:
+            print("SKNChat Stopped")
+    except SystemExit:
+        print("SKNChat Stopped")
