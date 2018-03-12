@@ -34,19 +34,25 @@ class ChatServer(Protocol):
                 self.chatEnabled = True
                 self.transport.write(data.encode())
                 reactor.callInThread(self.sendMsg, self.enc_instance)
-            else:
+
+            else:  # This part is first executed on connection. self.message_state is empty
+
+                # add to message_state list make self.medsage_state truthy. could use a variable and set to true
                 self.message_state.append(len(self.message_state))
+
+                # set pubkey_of_peer_hex to received data (which should be pubkey)
                 self.pubkey_of_peer_hex = data
+
+                # turn to bytes to be used to encrypt AES symmetric keys. This will be used for communication
                 pubkey = bytes.fromhex(self.pubkey_of_peer_hex)
+
+                # encrypt AES symmetric key and iv with pubkey
                 aes_key_iv = SKNPKI.encrypt_with_pubkey(pubkey_in_bytes=pubkey,
                                                         message=self.enc_instance.get_key_iv(in_hex=True, in_json=True),
                                                         in_json=True, is_hex=True)
-                # print("Hexadecimal Of Encrypted AES/IV", aes_key_iv)
+
+                # send encrypted AES symmetric key to peer. This key will be used in communication
                 self.transport.write(aes_key_iv.encode())
-
-
-
-                # if message state is empty then message expected is pubkey of pair and message sent is AES key and IV
 
     def sendMsg(self, encryption_instance):
         while True:

@@ -46,7 +46,7 @@ class SKNPKI:
         self.publicKey = None
 
     def generate_keys(self):
-        key = RSA.generate(4096)
+        key = RSA.generate(3072)
         self.privateKey =key.exportKey("DER")
         self.publicKey = key.publickey().exportKey("DER")
 
