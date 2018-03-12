@@ -5,19 +5,22 @@ from Crypto.Hash import SHA256
 
 import os, json
 
+# TODO: turn AES to Mode_EAX
 
 class SKNEncryption:
     def __init__(self, key=None, iv=None):
         self.key = os.urandom(32) if key is None else key
         self.iv = Random.new().read(AES.block_size) if iv is None else iv
+        self.cipher = AES.new(self.key, mode=AES.MODE_EAX)
+        self.nonce = self.cipher.nonce
 
     def encrypt_msg(self, msg, in_hex=False):
 
-        cipher = AES.new(self.key, AES.MODE_CFB, self.iv)
+        ciphertext, tag = self.cipher.encrypt_and_digest(plaintext=msg)
 
+        cipher_text = [ciphertext.hex(), tag.hex(), self.nonce.hex()]
 
-        cipher_text = self.iv + cipher.encrypt(msg.encode())
-        return cipher_text.hex() if in_hex else cipher_text
+        return json.dumps(cipher_text).hex() if in_hex else cipher_text
 
     def decrypt_msg(self, cipher_msg):
         try:
