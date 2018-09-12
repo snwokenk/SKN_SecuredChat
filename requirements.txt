@@ -1,2 +1,2 @@
 Twisted==17.9.0
-pycryptodome==3.4.11
+pycryptodome=>3.6.3
