@@ -22,6 +22,7 @@ class ChatServer(Protocol):
 
     def connectionLost(self, reason=connectionDone):
         try:
+            # reactor.callFromThread(reactor.stop)
             reactor.stop()
         except ReactorNotRunning:
             print("reactor not running")
@@ -43,7 +44,7 @@ class ChatServer(Protocol):
                 print(first_data)
                 self.chatEnabled = True
                 self.transport.write(data.encode())
-                reactor.callInThread(self.sendMsg, self.enc_instance)
+                reactor.callInThread(self.sendMsg, self.enc_instance.key)
 
             else:  # This part is first executed on connection. self.message_state is empty
 
@@ -57,25 +58,29 @@ class ChatServer(Protocol):
                 pubkey = bytes.fromhex(self.pubkey_of_peer_hex)
 
                 # encrypt AES symmetric key and iv with pubkey
-                aes_key_iv = SKNPKI.encrypt_with_pubkey(pubkey_in_bytes=pubkey,
-                                                        message=self.enc_instance.get_key_iv(in_hex=True, in_json=True),
+                aes_key_and_nonce = SKNPKI.encrypt_with_pubkey(pubkey_in_bytes=pubkey,
+                                                        message=self.enc_instance.get_key_and_nonce(in_hex=True, in_json=True),
                                                         in_json=True, is_hex=True)
 
                 # send encrypted AES symmetric key to peer. This key will be used in communication
-                self.transport.write(aes_key_iv.encode())
+                self.transport.write(aes_key_and_nonce.encode())
 
-    def sendMsg(self, encryption_instance):
+    def sendMsg(self, key):
+
         while True:
             print(">>> ", end="")
             msg = input()
             if msg and not msg == "exit":
                 print("\nYou: {}".format(msg))
+                encryption_instance = SKNEncryption(
+                    key=key)
                 enc_msg = encryption_instance.encrypt_msg(msg, in_hex=True).encode()
                 self.transport.write(enc_msg)
             elif msg == "exit":
                 break
             else:
                 continue
+
         self.transport.loseConnection()
 
 class ChatServerFactory(Factory):

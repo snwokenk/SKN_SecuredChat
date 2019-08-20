@@ -9,15 +9,11 @@ import json, time
 
 
 class ChatClient(Protocol):
-    """
-    When connection is made, ChatClient sends public key to chat server
-    and receives public key encrypted
-    """
     def __init__(self, factory):
         super().__init__()
         self.pki = SKNPKI()
         self.pki.generate_keys()
-        self.aes_key_nonce_list = None  # list [AES_KEY, IV] both in hexadecimal format
+        self.aes_key_iv_list = None  # list [AES_KEY, IV] both in hexadecimal format
         self.message_state = list()
         self.chatEnabled = False
         self.enc_instance = None
@@ -58,7 +54,7 @@ class ChatClient(Protocol):
                 print(data)
 
                 # create a separate thread, using callinThread (not callFromThread), for replying without blocking
-                reactor.callInThread(self.sendMsg, bytes.fromhex(self.aes_key_nonce_list[0]))
+                reactor.callInThread(self.sendMsg, self.enc_instance)
 
             else:  # executed first. self.message_state empty. Expecting hex of AES key/iv encrypted with own pubkey
 
@@ -66,14 +62,13 @@ class ChatClient(Protocol):
                 self.message_state.append(len(self.message_state))
 
                 # SKNPKI turns hex into json string and string into list. Then decrypts key/;iv with private key
-                self.aes_key_nonce_list = json.loads(SKNPKI.decrypt_with_privkey(self.pki.privateKey,
-                                                                                 cipher_text=data,
-                                                                                 is_hex_and_json=True))
+                self.aes_key_iv_list = json.loads(SKNPKI.decrypt_with_privkey(self.pki.privateKey,
+                                                                              cipher_text=data,
+                                                                              is_hex_and_json=True))
 
                 # using the AES key and IV, instantiate an SKNEncryption class.
-                self.enc_instance = SKNEncryption(key=bytes.fromhex(self.aes_key_nonce_list[0]),
-                                                  nonce=bytes.fromhex(self.aes_key_nonce_list[1]))
-
+                self.enc_instance = SKNEncryption(key=bytes.fromhex(self.aes_key_iv_list[0]),
+                                                  iv=bytes.fromhex(self.aes_key_iv_list[1]))
 
                 # instance of SKNEncryption now used to encrypt a test message "Message Now Encrypted"
                 msg = self.enc_instance.encrypt_msg("Message Now Encrypted", in_hex=True).encode()
@@ -81,15 +76,13 @@ class ChatClient(Protocol):
                 # send encrypted test message to peer
                 self.transport.write(msg)
 
-    def sendMsg(self, key):
+    def sendMsg(self, encryption_instance):
 
         while True:
             print(">>> ", end="")
             msg = input()
             if msg and not msg == "exit":
                 print("\nYou: {}".format(msg))
-                encryption_instance = SKNEncryption(
-                    key=key)
                 enc_msg = encryption_instance.encrypt_msg(msg, in_hex=True).encode()
                 self.transport.write(enc_msg)
             elif msg == "exit":
@@ -134,6 +127,3 @@ if __name__ == '__main__':
             print("SKNChat Stopped")
     except SystemExit:
         print("SKNChat Stopped")
-
-    else:
-        print("SKNChat Exited")
